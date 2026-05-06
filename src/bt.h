@@ -15,6 +15,7 @@ enum CHANNEL_TYPE {
 
 typedef void (*bt_data_callback_t)(CHANNEL_TYPE channel, uint8_t *data, uint16_t len);
 
+bool bt_disconnect();
 int bt_init();
 void bt_register_data_callback(bt_data_callback_t callback);
 void bt_send_packet(uint8_t *data, uint16_t len);

@@ -21,6 +21,9 @@
 int reportSeqCounter = 0;
 uint8_t packetCounter = 0;
 
+// 标志：记录 USB 是否处于 suspend 状态（用于控制蓝牙断开时是否断开 USB）
+bool is_usb_suspended = false;
+
 uint8_t interrupt_in_data[63] = {
     0x7f, 0x7d, 0x7f, 0x7e, 0x00, 0x00, 0xa7,
     0x08, 0x00, 0x00, 0x00, 0x52, 0x43, 0x30, 0x41,
@@ -71,6 +74,24 @@ void interrupt_loop() {
             critical_section_exit(&report_cs);
         }
     }
+}
+
+// Invoked when usb bus is suspended
+void tud_suspend_cb(bool remote_wakeup_en) {
+    printf("[USB] Bus suspended, remote_wakeup_enabled=%d\n", remote_wakeup_en);
+    
+    // 标记为 suspend 状态，蓝牙断开时保持 USB 连接以支持 Remote Wakeup
+    is_usb_suspended = true;
+    
+    // 断开蓝牙连接，让手柄进入休眠
+    bt_disconnect();
+}
+
+// Invoked when usb bus is resumed
+void tud_resume_cb(void) {
+    printf("[USB] Bus resumed\n");
+    // 清除 suspend 标志
+    is_usb_suspended = false;
 }
 
 void on_bt_data(CHANNEL_TYPE channel, uint8_t *data, uint16_t len) {
