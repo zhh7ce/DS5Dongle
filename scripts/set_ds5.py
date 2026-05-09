@@ -1,5 +1,5 @@
 import struct
-import hid
+import hid          #python-hidapi is needed, not python-hid
 import sys
 
 # Sony Vendor ID
