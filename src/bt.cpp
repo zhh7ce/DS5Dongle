@@ -17,8 +17,8 @@
 #include "config.h"
 #include "pico/util/queue.h"
 
-#define MTU_CONTROL 256
-#define MTU_INTERRUPT 1691
+#define MTU_CONTROL 672
+#define MTU_INTERRUPT 672
 
 using std::unordered_map;
 using std::vector;
@@ -39,6 +39,7 @@ static bt_data_callback_t bt_data_callback = nullptr;
 static bool check_dse = false;
 unordered_map<uint8_t, vector<uint8_t> > feature_data;
 queue_t send_fifo;
+queue_t priority_send_fifo;
 
 struct send_element {
     uint8_t data[512];
@@ -86,6 +87,7 @@ void bt_l2cap_init() {
 
 int bt_init() {
     queue_init(&send_fifo, sizeof(send_element), 10);
+    queue_init(&priority_send_fifo, sizeof(send_element), 10);
 
     bt_l2cap_init();
 
@@ -164,12 +166,19 @@ static void hci_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
 
         case GAP_EVENT_INQUIRY_COMPLETE:
         case HCI_EVENT_INQUIRY_COMPLETE: {
-            printf("[HCI] Inquiry complete\n");
+            printf("[HCI] Inquiry complete.\n");
             if (device_found) {
                 printf("[HCI] Connecting to %s...\n", bd_addr_to_str(current_device_addr));
                 new_pair = true;
                 hci_send_cmd(&hci_create_connection, current_device_addr,
                              hci_usable_acl_packet_types(), 0, 0, 0, 1);
+                break;
+            }
+            if (event_type == HCI_EVENT_INQUIRY_COMPLETE) {
+                printf("[HCI] Restart inquiry\n");
+                gap_inquiry_start(30);
+                gap_connectable_control(1);
+                gap_discoverable_control(1);
             }
             break;
         }
@@ -337,8 +346,8 @@ static void l2cap_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t 
             }
             if (packet[3] < 120 || packet[3] > 140) {
                 inactive_time = get_absolute_time();
-            } else if (absolute_time_diff_us(inactive_time, get_absolute_time()) > get_config().inactive_time * 60 *
-                       1000 * 1000) {
+            } else if (absolute_time_diff_us(inactive_time, get_absolute_time()) >
+                       static_cast<int64_t>(get_config().inactive_time) * 60 * 1000 * 1000) {
                 printf("disconnect when inactive\n");
                 inactive_time = get_absolute_time();
                 bt_disconnect();
@@ -352,7 +361,7 @@ static void l2cap_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t 
 #if !ENABLE_SERIAL
                     tud_connect();
 #endif
-                }else if (packet[0] == 0x02) {
+                } else if (packet[0] == 0x02) {
                     printf("Connected DS5 Controller\n");
                     check_dse = false;
                     is_dse = false;
@@ -364,10 +373,14 @@ static void l2cap_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t 
             if (packet[0] == 0xA3) {
                 uint8_t report_id = packet[1];
                 feature_data[report_id].assign(packet + 1, packet + size);
+#if ENABLE_VERBOSE
                 printf("[L2CAP] Stored Feature Report 0x%02X, len=%u\n", report_id, size - 1);
+#endif
             }
+#if ENABLE_VERBOSE
             printf("[L2CAP] HID Control data len=%u\n", size);
             printf_hexdump(packet, size);
+#endif
             bt_data_callback(CONTROL, packet, size);
         } else {
             printf("[L2CAP] Data on unknown channel 0x%04X (Interrupt: 0x%04X, Control: 0x%04X)\n",
@@ -386,6 +399,9 @@ static void l2cap_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t 
                 if (psm == PSM_HID_CONTROL) {
                     printf("[L2CAP] HID Control opened cid=0x%04X\n", local_cid);
                     hid_control_cid = local_cid;
+
+                    const auto mtu = l2cap_get_remote_mtu_for_local_cid(hid_control_cid);
+                    printf("[L2CAP] Remote Control MTU: %d\n",mtu);
                 } else if (psm == PSM_HID_INTERRUPT) {
                     printf("[L2CAP] HID Interrupt opened cid=0x%04X\n", local_cid);
                     hid_interrupt_cid = local_cid;
@@ -420,12 +436,14 @@ static void l2cap_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t 
                     memcpy(report32 + 2, packet_0x10, sizeof(packet_0x10));
                     bt_write(report32, sizeof(report32));
 
-                    //tud_connect();
-
                     extern bool is_usb_suspended;
                     if (is_usb_suspended) {
                         tud_remote_wakeup();
                     }
+                    const auto mtu = l2cap_get_remote_mtu_for_local_cid(hid_interrupt_cid);
+                    printf("[L2CAP] Remote Interrupt MTU: %d\n",mtu);
+
+                    // tud_connect();
                 } else {
                     printf("[L2CAP] Unknown Channel psm: 0x%02X", psm);
                 }
@@ -473,14 +491,20 @@ static void l2cap_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t 
         case L2CAP_EVENT_CAN_SEND_NOW: {
             // printf("[L2CAP] L2CAP_EVENT_CAN_SEND_NOW\n");
 
-            static send_element send_packet{};
-            if (queue_try_remove(&send_fifo, &send_packet)) {
+            send_element send_packet{};
+            bool get_data = false;
+            if (!queue_is_empty(&priority_send_fifo)) {
+                get_data = queue_try_remove(&priority_send_fifo, &send_packet);
+            }else {
+                get_data = queue_try_remove(&send_fifo, &send_packet);
+            }
+            if (get_data) {
                 const uint8_t status = l2cap_send(hid_interrupt_cid, send_packet.data, send_packet.len);
                 if (status != 0) {
                     printf("[L2CAP] L2CAP Send Error, Status: 0x%02X\n", status);
                 }
             }
-            if (!queue_is_empty(&send_fifo)) {
+            if (!queue_is_empty(&priority_send_fifo) || !queue_is_empty(&send_fifo)) {
                 l2cap_request_can_send_now_event(hid_interrupt_cid);
             }
             break;
@@ -488,7 +512,7 @@ static void l2cap_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t 
     }
 }
 
-void bt_write(uint8_t *data, uint16_t len) {
+void bt_write(const uint8_t *data, const uint16_t len, const bool priority) {
     if (hid_interrupt_cid == 0) return;
     static send_element packet{};
     memset(packet.data, 0, 512);
@@ -497,11 +521,18 @@ void bt_write(uint8_t *data, uint16_t len) {
     memcpy(packet.data + 1, data, len);
     fill_output_report_checksum(packet.data + 1, len);
 
-    if (!queue_try_add(&send_fifo, &packet)) {
-        printf("[L2CAP bt_write] Error: Failed to add packet to send FIFO\n");
-        return;
+    if (priority) {
+        if (!queue_try_add(&priority_send_fifo, &packet)) {
+            printf("[L2CAP bt_write] Error: Failed to add packet to priority send FIFO\n");
+            return;
+        }
+    }else {
+        if (!queue_try_add(&send_fifo, &packet)) {
+            printf("[L2CAP bt_write] Error: Failed to add packet to send FIFO\n");
+            return;
+        }
     }
-    if (queue_get_level(&send_fifo) == 1) {
+    if (queue_get_level(&send_fifo) + queue_get_level(&priority_send_fifo) == 1) {
         l2cap_request_can_send_now_event(hid_interrupt_cid);
     }
 }
@@ -523,7 +554,9 @@ vector<uint8_t> get_feature_data(uint8_t reportId, uint16_t len) {
         if (hid_control_cid != 0) {
             uint8_t get_feature[] = {0x43, reportId};
             l2cap_send(hid_control_cid, get_feature, sizeof(get_feature));
+#if ENABLE_VERBOSE
             printf("[L2CAP] Requesting Get Feature Report 0x%02X\n", reportId);
+#endif
         }
     }
     return ret;
@@ -537,8 +570,10 @@ void set_feature_data(uint8_t reportId, uint8_t *data, uint16_t len) {
         memcpy(get_feature + 2, data, len);
         fill_feature_report_checksum(get_feature + 1, len + 1);
         l2cap_send(hid_control_cid, get_feature, len + 2);
+#if ENABLE_VERBOSE
         printf("[L2CAP] Requesting Set Feature Report 0x%02X\n", reportId);
         printf_hexdump(get_feature, len + 2);
+#endif
     }
 }
 
