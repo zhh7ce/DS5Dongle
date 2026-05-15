@@ -20,6 +20,9 @@
 #if ENABLE_BATT_LED
 #include "battery_led.h"
 #endif
+#if ENABLE_USB_CLIENT
+#include "usb_client.h"
+#endif
 
 // Pico SDK speciifically for waiting on conditions
 #include "pico/critical_section.h"
@@ -264,6 +267,10 @@ int main() {
     bt_register_data_callback(on_bt_data);
 
     audio_init();
+
+#if ENABLE_USB_CLIENT
+    usb_client_init();
+#endif
 
 #if !ENABLE_SERIAL
     watchdog_enable(1000, true);

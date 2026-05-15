@@ -67,6 +67,13 @@ else ()
         set(SYS_CLOCK_KHZ_VALUE 320000)
 endif ()
 
+option(ENABLE_USB_CLIENT "Enable USB Client (Vendor Class) interface" OFF)
+if (ENABLE_USB_CLIENT)
+        set(ENABLE_USB_CLIENT_VALUE 1)
+else ()
+        set(ENABLE_USB_CLIENT_VALUE 0)
+endif ()
+
 
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
@@ -91,6 +98,10 @@ add_executable(ds5-bridge
 
 if (ENABLE_BATT_LED)
         target_sources(ds5-bridge PRIVATE src/battery_led.cpp)
+endif ()
+
+if (ENABLE_USB_CLIENT)
+        target_sources(ds5-bridge PRIVATE src/usb_client.cpp)
 endif ()
 
 # Cockos WDLResampler
@@ -123,6 +134,7 @@ target_compile_definitions(ds5-bridge PRIVATE
         ENABLE_BATT_LED=${ENABLE_BATT_LED_VALUE}
         SYS_CLOCK_KHZ=${SYS_CLOCK_KHZ_VALUE}
         DISABLE_SPEAKER_PROC=${DISABLE_SPEAKER_PROC_VALUE}
+        ENABLE_USB_CLIENT=${ENABLE_USB_CLIENT_VALUE}
 )
 
 option(ENABLE_WAKE_HID "Wake the Windows host on PS-button press" OFF)

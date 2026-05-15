@@ -34,6 +34,10 @@
 #define ENABLE_SERIAL 0
 #endif
 
+#ifndef ENABLE_USB_CLIENT
+#define ENABLE_USB_CLIENT 0
+#endif
+
 //--------------------------------------------------------------------+
 // Board Specific Configuration
 //--------------------------------------------------------------------+
@@ -100,10 +104,16 @@
 #define CFG_TUD_CDC               ENABLE_SERIAL
 #define CFG_TUD_MSC               0
 #define CFG_TUD_MIDI              0
-#define CFG_TUD_VENDOR            0
+#define CFG_TUD_VENDOR            ENABLE_USB_CLIENT
 
 // HID buffer size Should be sufficient to hold ID (if any) + Data
 #define CFG_TUD_HID_EP_BUFSIZE    64
+
+// Vendor Class Configuration (Direct Mode - No Buffering)
+#if ENABLE_USB_CLIENT
+#define CFG_TUD_VENDOR_RX_BUFSIZE 0
+#define CFG_TUD_VENDOR_TX_BUFSIZE 0
+#endif
 
 //--------------------------------------------------------------------
 // AUDIO CLASS DRIVER CONFIGURATION
