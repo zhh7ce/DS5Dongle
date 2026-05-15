@@ -18,6 +18,12 @@ extern "C" {
 void usb_client_init(void);
 
 /**
+ * Process queued USB data and send to Bluetooth
+ * Call this in main loop
+ */
+void usb_client_process_queue(void);
+
+/**
  * Send data to USB host via Vendor interface
  * @param data Pointer to data buffer
  * @param len Length of data to send

@@ -273,10 +273,10 @@ int main() {
     bt_init();
     bt_register_data_callback(on_bt_data);
 
-    audio_init();
-
 #if ENABLE_USB_CLIENT
     usb_client_init();
+#else
+    audio_init();
 #endif
 
 #if !ENABLE_SERIAL
@@ -289,7 +289,9 @@ int main() {
 #endif
         cyw43_arch_poll();
         tud_task();
-#if !ENABLE_USB_CLIENT
+#if ENABLE_USB_CLIENT
+        usb_client_process_queue();
+#else
         audio_loop();
 #endif
         interrupt_loop();

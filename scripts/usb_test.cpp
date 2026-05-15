@@ -1,18 +1,19 @@
 // USB Client Test Program
-// Sends sinusoidal waveform data to DS5Dongle Vendor interface
+// Reads audio data from raw.server and sends to DS5Dongle Vendor interface
 
 #include <libusb-1.0/libusb.h>
 #include <iostream>
-#include <cmath>
+#include <fstream>
 #include <cstdint>
 #include <cstring>
 #include <thread>
 #include <chrono>
+#include <vector>
 
 #define VENDOR_ID       0x054C
 #define PRODUCT_ID      0x0CE6
 #define INTERFACE_NUM   4
-#define PACKET_SIZE     64
+#define PACKET_SIZE     264
 #define PACKET_COUNT    1000
 
 int main() {
@@ -89,42 +90,66 @@ int main() {
         return 1;
     }
 
-    // Generate sinusoidal waveform data
-    uint8_t data[PACKET_SIZE];
-    for (int i = 0; i < PACKET_SIZE; i++) {
-        // Sinusoidal wave: -127 -> 0 -> +127 -> 0 -> -127
-        double value = 127 * sin(2.0 * M_PI * i / PACKET_SIZE);
-        data[i] = static_cast<uint8_t>(static_cast<int>(value) & 0xFF);
+    // Read audio data from raw.server
+    std::ifstream audio_file("raw.server", std::ios::binary | std::ios::ate);
+    if (!audio_file.is_open()) {
+        std::cerr << "Failed to open raw.server file" << std::endl;
+        libusb_release_interface(handle, INTERFACE_NUM);
+        libusb_close(handle);
+        libusb_exit(ctx);
+        return 1;
     }
 
-    std::cout << "Starting to send " << PACKET_COUNT << " packets (" 
-              << PACKET_SIZE << " bytes each)..." << std::endl;
+    // Get file size
+    std::streamsize file_size = audio_file.tellg();
+    audio_file.seekg(0, std::ios::beg);
+    
+    std::cout << "Audio file size: " << file_size << " bytes" << std::endl;
+    std::cout << "Total packets: " << (file_size / PACKET_SIZE) << std::endl;
+
+    // Read all data into buffer
+    std::vector<uint8_t> audio_buffer(file_size);
+    if (!audio_file.read(reinterpret_cast<char*>(audio_buffer.data()), file_size)) {
+        std::cerr << "Failed to read audio file" << std::endl;
+        libusb_release_interface(handle, INTERFACE_NUM);
+        libusb_close(handle);
+        libusb_exit(ctx);
+        return 1;
+    }
+    audio_file.close();
+
+    std::cout << "Starting to send audio data (264 bytes every 11ms)..." << std::endl;
 
     // Send packets
     int success_count = 0;
     int fail_count = 0;
     auto start_time = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < PACKET_COUNT; i++) {
+    size_t offset = 0;
+    while (offset + PACKET_SIZE <= audio_buffer.size()) {
         int transferred = 0;
-        rc = libusb_bulk_transfer(handle, out_ep_addr, data, PACKET_SIZE, 
+        rc = libusb_bulk_transfer(handle, out_ep_addr, 
+                                  audio_buffer.data() + offset, PACKET_SIZE, 
                                   &transferred, 1000); // 1 second timeout
 
         if (rc == 0 && transferred == PACKET_SIZE) {
             success_count++;
         } else {
             fail_count++;
-            std::cerr << "Error at packet " << i << ": " << libusb_error_name(rc) 
+            std::cerr << "Error at packet " << success_count << ": " 
+                      << libusb_error_name(rc) 
                       << " (transferred: " << transferred << ")" << std::endl;
             break;
         }
 
+        offset += PACKET_SIZE;
+
         // Progress report
-        if (i % 100 == 0) {
-            std::cout << "Sent " << i << " packets..." << std::endl;
+        if (success_count % 100 == 0) {
+            std::cout << "Sent " << success_count << " packets..." << std::endl;
         }
 
-        // Small delay to avoid overwhelming the device
+        // Send every 11ms (audio frame rate)
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
