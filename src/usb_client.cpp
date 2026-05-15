@@ -10,19 +10,55 @@
 
 #if ENABLE_USB_CLIENT
 
+#include "bt.h"
+
+#define REPORT_SIZE       398
+#define REPORT_ID         0x36
+#define SAMPLE_SIZE       64
+static uint8_t reportSeqCounter = 0;
+static uint8_t packetCounter = 0;
+
 // Callback invoked when data is received from host
 // In direct mode (BUFSIZE=0), this is called immediately when data arrives
-void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize) {
+void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint32_t bufsize) {
     (void) itf;
-    
-    // TODO: Process received data here
-    // For now, just print the received data length
-    printf("[USB_CLIENT] Received %u bytes\n", bufsize);
-    
-    // Example: Echo back the received data
-    // if (tud_vendor_mounted()) {
-    //     tud_vendor_write(buffer, bufsize);  // Direct mode: no flush needed
-    // }
+
+    if (264 != bufsize && 64 != bufsize) {
+        printf("[USB_CLIENT] Invalid size: %lu\n", bufsize);
+        return;
+    }
+
+    uint8_t pkt[REPORT_SIZE]{};
+    pkt[0] = REPORT_ID;
+    pkt[1] = reportSeqCounter << 4;
+    reportSeqCounter = (reportSeqCounter + 1) & 0x0F;
+    pkt[2] = 0x11 | 0 << 6 | 1 << 7;
+    pkt[3] = 7;
+    pkt[4] = 0b11111110;
+    const auto buf_len = SAMPLE_SIZE;
+    pkt[5] = buf_len;
+    pkt[6] = buf_len;
+    pkt[7] = buf_len;
+    pkt[8] = buf_len; // 这 4 个字节的作用未知，调整没有效果
+    pkt[9] = buf_len; // audio buffer length 只有调整这个字节生效。
+    pkt[10] = packetCounter++;
+    pkt[11] = 0x12 | 0 << 6 | 1 << 7;
+    pkt[12] = SAMPLE_SIZE;
+    memcpy(pkt + 13, buffer, SAMPLE_SIZE);
+
+#if !DISABLE_SPEAKER_PROC
+    if (bufsize == 264) {
+        extern bool plug_headset;
+        pkt[77] = (plug_headset ? 0x16 : 0x13) | 0 << 6 | 1 << 7; // Speaker: 0x13
+        // L Headset Mono: 0x14
+        // L Headset R Speaker: 0x15
+        // Headset: 0x16
+        pkt[78] = 200;
+        memcpy(pkt + 79, buffer+SAMPLE_SIZE, 200);
+    }
+#endif
+
+    bt_write(pkt, sizeof(pkt), true);
 }
 
 // Callback invoked when data transmission is complete

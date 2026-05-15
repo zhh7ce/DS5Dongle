@@ -27,12 +27,12 @@
 #include "tusb.h"
 #include "config.h"
 
-#ifndef ENABLE_SERIAL
-#define ENABLE_SERIAL 0
-#endif
-
 #ifndef ENABLE_USB_CLIENT
 #define ENABLE_USB_CLIENT 0
+#endif
+
+#ifndef ENABLE_SERIAL
+#define ENABLE_SERIAL 0
 #endif
 
 bool ds_mode() {
@@ -47,12 +47,12 @@ enum {
     ITF_NUM_AUDIO_STREAMING_OUT,
     ITF_NUM_AUDIO_STREAMING_IN,
     ITF_NUM_HID,
+#if ENABLE_USB_CLIENT
+    ITF_NUM_USBSINK,
+#endif
 #if ENABLE_SERIAL
     ITF_NUM_CDC,
     ITF_NUM_CDC_DATA,
-#endif
-#if ENABLE_USB_CLIENT
-    ITF_NUM_USBSINK,
 #endif
     ITF_NUM_TOTAL,
 
@@ -64,11 +64,11 @@ enum {
 #endif
     CONFIG_DESC_LEN_BASE = 0x00E3 + CONFIG_DESC_LEN_AUDIO_IAD,
     CONFIG_DESC_LEN_TOTAL = CONFIG_DESC_LEN_BASE
-#if ENABLE_SERIAL
-        + TUD_CDC_DESC_LEN
-#endif
 #if ENABLE_USB_CLIENT
         + TUD_VENDOR_DESC_LEN
+#endif
+#if ENABLE_SERIAL
+        + TUD_CDC_DESC_LEN
 #endif
 };
 
@@ -78,11 +78,11 @@ enum {
     STRID_MANUFACTURER,
     STRID_PRODUCT,
     STRID_SERIAL,
-#if ENABLE_SERIAL
-    STRID_CDC,
-#endif
 #if ENABLE_USB_CLIENT
     STRID_USBSINK,
+#endif
+#if ENABLE_SERIAL
+    STRID_CDC,
 #endif
 };
 
@@ -394,14 +394,14 @@ uint8_t descriptor_configuration[] = {
     0x40, 0x00, // wMaxPacketSize: 64
     0x01, // bInterval: 1 (polling every 4ms -> 1ms)
 
-#if ENABLE_SERIAL
-    // --- CDC ACM (USB Serial) ---
-    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, STRID_CDC, 0x85, 0x08, 0x06, 0x86, 0x40),
-#endif
-
 #if ENABLE_USB_CLIENT
     // --- USB Client (Vendor Class) ---
     TUD_VENDOR_DESCRIPTOR(ITF_NUM_USBSINK, STRID_USBSINK, 0x87, 0x07, 64),
+#endif
+
+#if ENABLE_SERIAL
+    // --- CDC ACM (USB Serial) ---
+    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, STRID_CDC, 0x85, 0x08, 0x06, 0x86, 0x40),
 #endif
 };
 
@@ -825,11 +825,11 @@ static char const *string_desc_arr[] =
     "Sony Interactive Entertainment", // 1: Manufacturer
     NULL, // 2: Product
     NULL, // 3: Serials will use unique ID if possible
-#if ENABLE_SERIAL
-    "USB Serial", // 4: CDC interface
-#endif
 #if ENABLE_USB_CLIENT
     "USB Client", // 5: Vendor interface
+#endif
+#if ENABLE_SERIAL
+    "USB Serial", // 4: CDC interface
 #endif
 };
 

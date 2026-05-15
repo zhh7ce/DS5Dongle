@@ -33,6 +33,9 @@ uint8_t packetCounter = 0;
 // 标志：记录 USB 是否处于 suspend 状态（用于控制蓝牙断开时是否断开 USB）
 bool is_usb_suspended = false;
 
+// 是否插入耳机
+bool plug_headset = false;
+
 uint8_t interrupt_in_data[63] = {
     0x7f, 0x7d, 0x7f, 0x7e, 0x00, 0x00, 0xa7,
     0x08, 0x00, 0x00, 0x00, 0x52, 0x43, 0x30, 0x41,
@@ -101,6 +104,10 @@ void tud_resume_cb(void) {
     printf("[USB] Bus resumed\n");
     // 清除 suspend 标志
     is_usb_suspended = false;
+}
+
+void set_headset(bool state) {
+    plug_headset = state;
 }
 
 void on_bt_data(CHANNEL_TYPE channel, uint8_t *data, uint16_t len) {
@@ -282,7 +289,9 @@ int main() {
 #endif
         cyw43_arch_poll();
         tud_task();
+#if !ENABLE_USB_CLIENT
         audio_loop();
+#endif
         interrupt_loop();
 #if ENABLE_BATT_LED
         battery_led_tick();

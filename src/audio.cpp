@@ -30,7 +30,6 @@ using std::max;
 static WDL_Resampler resampler;
 static uint8_t reportSeqCounter = 0;
 static uint8_t packetCounter = 0;
-static bool plug_headset = false;
 alignas(8) static uint32_t audio_core1_stack[8192];
 queue_t audio_fifo;
 static uint8_t opus_buf[200];
@@ -39,10 +38,6 @@ critical_section_t opus_cs;
 struct audio_raw_element {
     float data[512 * 2];
 };
-
-void set_headset(bool state) {
-    plug_headset = state;
-}
 
 void audio_loop() {
     // 1. 读取 USB 音频数据
@@ -120,6 +115,7 @@ void audio_loop() {
         pkt[12] = SAMPLE_SIZE;
         memcpy(pkt + 13, haptic_buf, SAMPLE_SIZE);
 #if !DISABLE_SPEAKER_PROC
+        extern bool plug_headset;
         pkt[77] = (plug_headset ? 0x16 : 0x13) | 0 << 6 | 1 << 7; // Speaker: 0x13
         // L Headset Mono: 0x14
         // L Headset R Speaker: 0x15
