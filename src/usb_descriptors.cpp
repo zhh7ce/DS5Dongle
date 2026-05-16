@@ -35,6 +35,10 @@
 #define ENABLE_SERIAL 0
 #endif
 
+#ifndef ENABLE_AUDIO
+#define ENABLE_AUDIO 1
+#endif
+
 bool ds_mode() {
     if (get_config().controller_mode == 2) {
         return !is_dse;
@@ -43,9 +47,11 @@ bool ds_mode() {
 }
 
 enum {
+#if ENABLE_AUDIO
     ITF_NUM_AUDIO_CONTROL = 0,
     ITF_NUM_AUDIO_STREAMING_OUT,
     ITF_NUM_AUDIO_STREAMING_IN,
+#endif
     ITF_NUM_HID,
 #if ENABLE_USB_CLIENT
     ITF_NUM_USBSINK,
@@ -57,12 +63,17 @@ enum {
     ITF_NUM_TOTAL,
 
     CONFIG_DESC_LEN_AUDIO_IAD =
-#if ENABLE_SERIAL
+#if ENABLE_SERIAL && ENABLE_AUDIO
         8,
 #else
         0,
 #endif
+#if ENABLE_AUDIO
     CONFIG_DESC_LEN_BASE = 0x00E3 + CONFIG_DESC_LEN_AUDIO_IAD,
+#else
+    // Configuration(9) + HID Interface(9) + HID Descriptor(9) + 2 Endpoints(7+7) = 41
+    CONFIG_DESC_LEN_BASE = 41 + CONFIG_DESC_LEN_AUDIO_IAD,
+#endif
     CONFIG_DESC_LEN_TOTAL = CONFIG_DESC_LEN_BASE
 #if ENABLE_USB_CLIENT
         + TUD_VENDOR_DESC_LEN
@@ -141,7 +152,7 @@ uint8_t descriptor_configuration[] = {
     0xE0, // bmAttributes: SELF-POWERED, REMOTE-WAKEUP
     0xFA, // bMaxPower: 500mA (250 * 2mA)
 
-#if ENABLE_SERIAL
+#if ENABLE_AUDIO
     // --- INTERFACE ASSOCIATION DESCRIPTOR: Audio function (interfaces 0-2) ---
     0x08, // bLength
     TUSB_DESC_INTERFACE_ASSOCIATION, // bDescriptorType
@@ -153,6 +164,7 @@ uint8_t descriptor_configuration[] = {
     0x00, // iFunction
 
 #endif
+#if ENABLE_AUDIO
     // --- INTERFACE DESCRIPTOR (0.0): Audio Control ---
     0x09, // bLength
     0x04, // bDescriptorType (INTERFACE)
@@ -357,10 +369,16 @@ uint8_t descriptor_configuration[] = {
     0x00, // Lock Delay Units
     0x00, 0x00, // Lock Delay
 
+#endif
+
     // --- INTERFACE DESCRIPTOR (3.0): HID (DualSense 5 Gamepad + Touchpad) ---
     0x09, // bLength
     0x04, // bDescriptorType (INTERFACE)
+#if ENABLE_AUDIO
     0x03, // bInterfaceNumber: 3
+#else
+    0x00, // bInterfaceNumber: 0
+#endif
     0x00, // bAlternateSetting: 0
     0x02, // bNumEndpoints: 2 (IN + OUT)
     0x03, // bInterfaceClass: HID

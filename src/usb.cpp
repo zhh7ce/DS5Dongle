@@ -36,6 +36,8 @@ float volume[2] = {-100.0f,0.0f}; // 0: SPEAKER(0x02) 1: MIC(0x05)
 // UAC1 Helper Functions
 //--------------------------------------------------------------------+
 
+#if ENABLE_AUDIO
+
 static bool audio10_set_req_entity(tusb_control_request_t const *p_request, uint8_t *pBuff) {
     uint8_t channelNum = TU_U16_LOW(p_request->wValue);
     uint8_t ctrlSel = TU_U16_HIGH(p_request->wValue);
@@ -189,3 +191,5 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
     (void) instance;
     (void) len;
 }
+
+#endif

@@ -74,6 +74,13 @@ else ()
         set(ENABLE_USB_CLIENT_VALUE 0)
 endif ()
 
+option(ENABLE_AUDIO "Enable USB Audio function (Speaker + Mic)" ON)
+if (ENABLE_AUDIO)
+        set(ENABLE_AUDIO_VALUE 1)
+else ()
+        set(ENABLE_AUDIO_VALUE 0)
+endif ()
+
 
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
@@ -90,11 +97,14 @@ add_executable(ds5-bridge
         src/usb_descriptors.cpp
         src/main.cpp
         src/usb.cpp
-        src/audio.cpp
         src/bt.cpp
         src/config.cpp
         src/cmd.cpp
 )
+
+if (ENABLE_AUDIO)
+        target_sources(ds5-bridge PRIVATE src/audio.cpp)
+endif ()
 
 if (ENABLE_BATT_LED)
         target_sources(ds5-bridge PRIVATE src/battery_led.cpp)
@@ -135,6 +145,7 @@ target_compile_definitions(ds5-bridge PRIVATE
         SYS_CLOCK_KHZ=${SYS_CLOCK_KHZ_VALUE}
         DISABLE_SPEAKER_PROC=${DISABLE_SPEAKER_PROC_VALUE}
         ENABLE_USB_CLIENT=${ENABLE_USB_CLIENT_VALUE}
+        ENABLE_AUDIO=${ENABLE_AUDIO_VALUE}
 )
 
 option(ENABLE_WAKE_HID "Wake the Windows host on PS-button press" OFF)

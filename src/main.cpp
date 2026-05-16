@@ -7,7 +7,9 @@
 #include "bt.h"
 #include "utils.h"
 #include "resample.h"
+#if ENABLE_AUDIO
 #include "audio.h"
+#endif
 #include "hardware/clocks.h"
 #include "hardware/vreg.h"
 #include "hardware/watchdog.h"
@@ -164,6 +166,7 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
     return feature_data.empty() ? 0 : feature_data.size() - 1;
 }
 
+#if ENABLE_AUDIO
 bool tud_audio_set_itf_cb(uint8_t rhport, tusb_control_request_t const *p_request) {
     (void) rhport;
     uint8_t const itf = tu_u16_low(p_request->wIndex); // wInterface
@@ -175,6 +178,7 @@ bool tud_audio_set_itf_cb(uint8_t rhport, tusb_control_request_t const *p_reques
 
     return true;
 }
+#endif
 
 // Invoked when received SET_REPORT control request or
 // received data on OUT endpoint ( Report ID = 0, Type = 0 )
@@ -275,7 +279,7 @@ int main() {
 
 #if ENABLE_USB_CLIENT
     usb_client_init();
-#else
+#elif ENABLE_AUDIO
     audio_init();
 #endif
 
@@ -291,7 +295,7 @@ int main() {
         tud_task();
 #if ENABLE_USB_CLIENT
         usb_client_process_queue();
-#else
+#elif ENABLE_AUDIO
         audio_loop();
 #endif
         interrupt_loop();
