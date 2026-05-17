@@ -36,7 +36,7 @@
 #endif
 
 #ifndef ENABLE_AUDIO
-#define ENABLE_AUDIO 1
+#define ENABLE_AUDIO 0
 #endif
 
 bool ds_mode() {
