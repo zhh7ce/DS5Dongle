@@ -5,6 +5,9 @@
 # 功能特点
  - 支持HD震动
 
+# 改进
+添加客户端模式，需要配合[DS5Server](https://github.com/zhh7ce/DS5Server)使用。编码过程在Linux PC中进行，可以降低Pico工作压力，降低延迟，优化音质。Pico W可能可以启用音频。后续可能添加麦克风功能，并在PC中处理opus解码。
+
 # 使用方法
 1. 按住 Pico 上的BOOTSEL进入刷机
 2. 将 .uf2 文件拖入进去

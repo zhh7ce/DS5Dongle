@@ -16,6 +16,10 @@ This project enables the Raspberry Pi Pico2W to function as a Bluetooth bridge f
 - ⚙️ Adjustable haptic gain via microphone volume
 - 🔕 Configurable LED and disconnection behaviors
 
+## Improvements
+
+Add client mode which requires [DS5Server](https://github.com/zhh7ce/DS5Server). Encoding is performed on a Linux PC to reduce Pico workload, lower latency, and optimize audio quality. Pico W may enable audio support. Microphone functionality may be added in the future, with Opus decoding handled on the PC.
+
 ## Getting Started
 
 ### Flashing Firmware
