@@ -11,6 +11,7 @@
 #if ENABLE_USB_CLIENT
 
 #include "bt.h"
+#include "state_mgr.h"
 #include "pico/cyw43_arch.h"
 #include "pico/util/queue.h"
 
@@ -84,18 +85,25 @@ void usb_client_process_queue(void) {
         pkt[8] = buf_len; // 这 4 个字节的作用未知，调整没有效果
         pkt[9] = buf_len; // audio buffer length 只有调整这个字节生效。
         pkt[10] = packetCounter++;
-        pkt[11] = 0x12 | 0 << 6 | 1 << 7;
-        pkt[12] = SAMPLE_SIZE;
-        memcpy(pkt + 13, element.data, SAMPLE_SIZE);
+        // SetStateData
+        pkt[11] = 0x10 | 0 << 6 | 1 << 7;
+        pkt[12] = 63;
+        state_set(pkt + 13,63);
+        // Haptics Audio Data
+        pkt[76] = 0x12 | 0 << 6 | 1 << 7;
+        pkt[77] = SAMPLE_SIZE;
+        memcpy(pkt + 78, element.data, SAMPLE_SIZE);
+
+        // Speaker Audio Data
         extern bool plug_headset;
-        pkt[77] = (plug_headset ? 0x16 : 0x13) | 0 << 6 | 1 << 7; // Speaker: 0x13
+        pkt[142] = (plug_headset ? 0x16 : 0x13) | 0 << 6 | 1 << 7; // Speaker: 0x13
         // L Headset Mono: 0x14
         // L Headset R Speaker: 0x15
         // Headset: 0x16
-        pkt[78] = 200;
-        memcpy(pkt + 79, element.data + SAMPLE_SIZE, 200);
+        pkt[143] = 200;
+        memcpy(pkt + 144, element.data + SAMPLE_SIZE, 200);
 
-        bt_write(pkt, sizeof(pkt), true);
+        bt_write(pkt, sizeof(pkt));
     }
 }
 
