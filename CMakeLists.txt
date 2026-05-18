@@ -137,7 +137,6 @@ target_compile_definitions(ds5-bridge PRIVATE
         ENABLE_SERIAL=${ENABLE_SERIAL_VALUE}
         PICO_FLASH_ASSUME_CORE1_SAFE=1
         WDL_RESAMPLE_TYPE=float
-        CYW43_PIO_CLOCK_DIV_INT=${CYW43_PIO_CLOCK_DIV_VALUE}
         PICO_STDIO_USB_USE_DEFAULT_DESCRIPTORS=0
         PICO_STDIO_USB_ENABLE_RESET_VIA_BAUD_RATE=0
         PICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0
@@ -148,6 +147,13 @@ target_compile_definitions(ds5-bridge PRIVATE
         ENABLE_USB_CLIENT=${ENABLE_USB_CLIENT_VALUE}
         ENABLE_AUDIO=${ENABLE_AUDIO_VALUE}
 )
+
+# Set CYW43 PIO clock div only when audio is enabled (overclocking mode)
+if (ENABLE_AUDIO)
+    target_compile_definitions(ds5-bridge PRIVATE
+            CYW43_PIO_CLOCK_DIV_INT=${CYW43_PIO_CLOCK_DIV_VALUE}
+    )
+endif()
 
 option(ENABLE_WAKE_HID "Wake the Windows host on PS-button press" OFF)
 if(ENABLE_WAKE_HID)
